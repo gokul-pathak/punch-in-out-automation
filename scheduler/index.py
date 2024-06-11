@@ -6,6 +6,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 import time
 from helper import get_online_offline_devices, get_operation_type
 from crontab import CronTab
+import schedule
+import logging
 # Params
 URL = 'http://185.185.127.219:8080/login.jsp'   # Url of the orange website
 USERNAME_INPUT_ID = 'login-form-username'       # Id of username input element
@@ -13,6 +15,10 @@ PASSWORD_INPUT_ID = 'login-form-password'       # Id of password input element
 SUBMIT_BTN_ID = 'login-form-submit'             # Id of submit btn
 username='phurba.sherpa'
 password='Phurb@12'
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def main():
 
@@ -52,6 +58,17 @@ def main():
     time.sleep(10)
     driver.quit()
     print(title)
-    
 if __name__=="__main__": 
     main() 
+
+def job():
+    logging.info("Job triggered")
+
+# Schedule the job every 15 minutes
+schedule.every(15).minutes.do(job)
+
+# Run scheduler in a loop
+while True:
+    schedule.run_pending()
+    time.sleep(1)
+
