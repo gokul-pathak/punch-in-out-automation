@@ -8,6 +8,7 @@ from helper import get_online_offline_devices, get_operation_type
 from crontab import CronTab
 import schedule
 import logging
+import datetime
 # Params
 URL = 'http://185.185.127.219:8080/login.jsp'   # Url of the orange website
 USERNAME_INPUT_ID = 'login-form-username'       # Id of username input element
@@ -62,7 +63,14 @@ if __name__=="__main__":
     main() 
 
 def job():
-    logging.info("Job triggered")
+    now = datetime.datetime.now()
+    print(now)
+    current_time = now.time()
+    print(current_time)
+    if now.weekday() < 5:  # Monday to Friday 1 is monday 
+        if (datetime.time(10, 0) <= current_time <= datetime.time(11, 15)) or (datetime.time(18, 0) <= current_time <= datetime.time(19, 15)):
+            logging.info("Job triggered within allowed time interval")
+            print("job is triggered")
 
 # Schedule the job every 15 minutes
 schedule.every(15).minutes.do(job)
