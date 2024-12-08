@@ -1,0 +1,58 @@
+[Unit]
+Description=Punch In/Out Automation Service
+After=network.target
+
+[Service]
+Type=simple
+User=your_user
+WorkingDirectory=/path/to/scheduler
+ExecStart=/usr/bin/python3 /path/to/scheduler/init.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+
+Start the service:
+sudo systemctl enable punch-automation
+sudo systemctl start punch-automation
+
+
+
+
+Key Improvements in this version:
+
+Robust error handling throughout the codebase
+Comprehensive logging system
+Automated recovery from failures
+Headless Chrome operation
+Proper cleanup of resources
+Service-based continuous operation
+Configurable schedule windows
+MAC address tracking
+API integration for user credentials
+Network status verification
+To make it operational:
+
+Update the URLs and credentials in the configuration
+Install Chrome and ChromeDriver
+Set up the Django API backend
+Configure the IP addresses to monitor
+Set up the system service
+The system will now:
+
+Run continuously Monday-Friday
+Check for devices every 10 minutes during configured hours
+Automatically punch in online devices in the morning
+Automatically punch out offline devices in the evening
+Log all operations for monitoring
+Restart automatically if there are any crashes
+
+
+Enhancement
+
+Add any additional error handling?
+Modify the schedule windows?
+Add more monitoring capabilities?
+Include additional security features?

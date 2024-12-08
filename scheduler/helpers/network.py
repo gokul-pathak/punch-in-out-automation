@@ -1,59 +1,81 @@
-
-### Lib import
 import re
 import subprocess
-from datetime import datetime, time
+import logging
+from typing import List, Tuple, Dict
+import socket
+from datetime import datetime
 
-# Parameters
-OFFINE_MSG = 'Destination host unreachable'     # Echo message from router if destination ip is offline/invalid
-ONLINE_ECHO_FAILED_MSG = 'Request timed out.'   # Echo message from router if destination ip's firewall blocks echo
-ONLINE_ECHO_SUCCESS_MSG = '0% loss'             # Echo message from router 
-MAC_ADDR_PATTERN = '([-0-9a-f]{17})'            # Mac address pattern in arp table
+logger = logging.getLogger(__name__)
 
-def get_mac_addr_list(ip_addr_list):
-    ip_mac_table = {}
-    for ip_addr in ip_addr_list:
-        arp_req_command = 'arp -a ' + ip_addr
-        result = subprocess.run(arp_req_command, stdout=subprocess.PIPE)
-        arp_info = result.stdout.decode('utf8')
+class NetworkManager:
+    OFFLINE_MSG = 'Destination host unreachable'
+    ONLINE_ECHO_FAILED_MSG = 'Request timed out.'
+    ONLINE_ECHO_SUCCESS_MSG = '0% loss'
+    MAC_ADDR_PATTERN = '([-0-9a-f]{17})'
+    PING_TIMEOUT = 2  # seconds
+
+    @staticmethod
+    def ping_device(ip_addr: str) -> bool:
+        """
+        Ping device and return True if online, False if offline
+        """
+        try:
+            # Create the ping command based on OS
+            if subprocess.os.name == 'nt':  # Windows
+                ping_cmd = ['ping', '-n', '1', '-w', str(NetworkManager.PING_TIMEOUT * 1000), ip_addr]
+            else:  # Linux/Unix
+                ping_cmd = ['ping', '-c', '1', '-W', str(NetworkManager.PING_TIMEOUT), ip_addr]
+            
+            result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode('utf-8')
+            
+            return (NetworkManager.ONLINE_ECHO_SUCCESS_MSG in output or 
+                   NetworkManager.ONLINE_ECHO_FAILED_MSG in output)
         
-        # Extract mac
-        matched_mac_addr_list = re.findall(MAC_ADDR_PATTERN, arp_info)
+        except subprocess.SubprocessError as e:
+            logger.error(f"Error pinging device {ip_addr}: {str(e)}")
+            return False
+
+    @staticmethod
+    def get_mac_address(ip_addr: str) -> str:
+        """
+        Get MAC address for given IP address
+        """
+        try:
+            if subprocess.os.name == 'nt':  # Windows
+                arp_cmd = ['arp', '-a', ip_addr]
+            else:  # Linux/Unix
+                arp_cmd = ['arp', '-n', ip_addr]
+            
+            result = subprocess.run(arp_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode('utf-8')
+            
+            mac_matches = re.findall(NetworkManager.MAC_ADDR_PATTERN, output)
+            return mac_matches[0] if mac_matches else None
+            
+        except (subprocess.SubprocessError, IndexError) as e:
+            logger.error(f"Error getting MAC address for {ip_addr}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_online_offline_devices(ip_addr_list: List[str]) -> Tuple[List[str], List[str]]:
+        """
+        Categorize devices into online and offline lists
+        """
+        online_ips = []
+        offline_ips = []
         
-        # if matched then will have matched list, if not then []
-        if len(matched_mac_addr_list) != 0:
-            ip_mac_table[ip_addr] = matched_mac_addr_list[0]
-    return ip_mac_table
-
-def ping_device(ip_addr):
-    """
-    Function to ping the ip and return the echo message
-    """
-    ping_command = 'ping -n 1 '+ ip_addr    
-    result = subprocess.run(ping_command, stdout=subprocess.PIPE)
-    output = result.stdout.decode('utf8')
-    return output
-
-# below func needs renaming: categorize_devices (will categorize to online and offline) 
-def get_online_offline_devices(ip_addr_list):
-
-    """
-    1. For each of the ip-address, ping the device.
-    2. Check the message echoed from ping.
-    3. Based on the message echoed, insert the pinged ip in offline bucket or online bucket
-    4. Return both bucket
-    """
-
-    online_ip_addr_list = []
-    offline_ip_addr_list = []
-    
-    for ip_addr in ip_addr_list:
-        output = ping_device(ip_addr)
-        if OFFINE_MSG in output:
-            offline_ip_addr_list.append(ip_addr)
-        elif  ONLINE_ECHO_FAILED_MSG in output or ONLINE_ECHO_SUCCESS_MSG in output:
-            online_ip_addr_list.append(ip_addr)
-
-    return online_ip_addr_list, offline_ip_addr_list
-
-
+        for ip in ip_addr_list:
+            try:
+                if NetworkManager.ping_device(ip):
+                    online_ips.append(ip)
+                    logger.info(f"Device {ip} is online")
+                else:
+                    offline_ips.append(ip)
+                    logger.info(f"Device {ip} is offline")
+            
+            except Exception as e:
+                logger.error(f"Error checking device {ip}: {str(e)}")
+                offline_ips.append(ip)
+        
+        return online_ips, offline_ips
